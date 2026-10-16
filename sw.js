@@ -4,7 +4,7 @@
 // 而 HTML 已经是新的，两者一错开就表现为"按钮没反应 + 颜色没变"。
 const CACHE_NAME = "yunara-admin-static-v15";
 const PRIMARY_HOST = "wind-xber.upma.site";
-const FALLBACK_PAGE = "https://admin.re2347.ccwu.cc/";
+const FALLBACK_PAGE = "https://re2347.github.io/leagueyunara-admin/";
 const STATIC_ASSETS = [
   "./",
   "./index.html",

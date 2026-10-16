@@ -1,5 +1,5 @@
 const PRIMARY_STATIC_HOST = "wind-xber.upma.site";
-const FALLBACK_PAGE = "https://admin.re2347.ccwu.cc/";
+const FALLBACK_PAGE = "https://re2347.github.io/leagueyunara-admin/";
 const PROBE_TIMEOUT_MS = 5000;
 
 if (location.hostname === PRIMARY_STATIC_HOST) {

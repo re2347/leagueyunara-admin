@@ -25,7 +25,7 @@ const SUPABASE_HEALTH_REFRESH_MS = 60000;
 const SUPABASE_HEALTH_TIMEOUT_MS = 8000;
 const STATIC_HOST_PROBE_MS = 60000;
 const STATIC_HOST_PROBE_TIMEOUT_MS = 5000;
-const STATIC_FALLBACK_PAGE = "https://admin.re2347.ccwu.cc/";
+const STATIC_FALLBACK_PAGE = "https://re2347.github.io/leagueyunara-admin/";
 const MAX_PLAN_DAYS = 36500;
 /**
  * 趋势按日聚合，一天之内不会自己变，所以它不进 15 秒的自动刷新轮次：
