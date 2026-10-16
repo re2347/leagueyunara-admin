@@ -184,7 +184,7 @@ function credentialStores() {
     found.push(sessionStorage);
   } catch { /* 没有会话存储 */ }
   try {
-    found.push(localStorage);
+    void 0 /* 镜像：与买家页同源，会话只留 sessionStorage */;
   } catch { /* 没有本地存储 */ }
   return found;
 }
