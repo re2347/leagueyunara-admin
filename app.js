@@ -8,6 +8,9 @@ import { initMask } from "./mask.js";
 
 // Cloudflare Worker 自定义域：备用端点（排在 Supabase 之后）。
 // 2026-09-25 起策略为「Supabase 优先 / CF 为辅」，此处不再作为默认端点。
+/* 镜像产物：与买家页同源，凭据一律不落 localStorage（缘由见 build-site-mirror.mjs） */
+const localStorage = sessionStorage;
+
 const CF_API = "https://license.re2347.ccwu.cc";
 const SUPABASE_API = "https://kzqgphxrghdclkwneqyn.supabase.co/functions/v1/admin-api";
 const SUPABASE_HEALTH_URL = "https://kzqgphxrghdclkwneqyn.supabase.co/functions/v1/auth/health";
