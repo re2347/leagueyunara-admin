@@ -461,7 +461,7 @@
               <div class="card__head">
                 <div>
                   <h2 id="connection-title">连接到授权服务</h2>
-                  <p class="card__desc">管理员 API 密钥默认只保存在当前页面；勾选“记住此设备”后会保存到本机浏览器。备用端点与本机预览都从这里改地址。</p>
+                  <p class="card__desc">登录一次之后，本页刷新会自动重连，不必再点「连接」；关掉标签页则回到登录框。勾选“记住此设备”会把这个会话和管理员密钥留到本机浏览器，直到会话到期（8 小时）。备用端点与本机预览都从这里改地址。</p>
                 </div>
               </div>
               <div class="auth-controls">
@@ -474,6 +474,7 @@
                   <input id="admin-key" type="password" placeholder="输入 ADMIN_API_KEY" autocomplete="off" />
                 </label>
                 <button id="connect-button" class="button button-primary" type="button">连接</button>
+                <button id="logout-button" class="button button-quiet" type="button">退出登录</button>
               </div>
               <!-- 「记住此设备」必须和三个控件同层：它原来嵌在密钥那个 label 里面，
                    多出来的一行把该字段整体顶高一档，而且 label 套 label 是非法 HTML。 -->

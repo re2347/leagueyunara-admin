@@ -12,6 +12,13 @@ const CF_API = "https://license.re2347.ccwu.cc";
 const SUPABASE_API = "https://kzqgphxrghdclkwneqyn.supabase.co/functions/v1/admin-api";
 const SUPABASE_HEALTH_URL = "https://kzqgphxrghdclkwneqyn.supabase.co/functions/v1/auth/health";
 const ADMIN_KEY_STORAGE = "cskin.admin.api-key";
+/** 账号登录换来的会话令牌。令牌自带 exp（后端签发 8 小时），所以恢复时会先比对到期时间，过期的绝不自动带上。 */
+const ADMIN_SESSION_STORAGE = "yunara.admin.session";
+/**
+ * 连过一次就记住连的是哪一条线。自动重连必须连回他刚才连的那个服务：以前刷新后地址会退回
+ * HTML 里写死的默认值，于是备用端点（和本机预览）选过一次就等于没选。
+ */
+const API_URL_STORAGE = "yunara.admin.api-url";
 const AUTO_REFRESH_MS = 15000;
 const REMAINING_REFRESH_MS = 30000;
 const SUPABASE_HEALTH_REFRESH_MS = 60000;
@@ -31,6 +38,8 @@ const state = {
   apiUrl: SUPABASE_API,
   adminKey: "",
   sessionToken: "",
+  adminUsername: "",
+  connecting: false,
   connected: false,
   page: 1,
   pageSize: 20,
@@ -146,7 +155,7 @@ async function requestWithFailover(path, options = {}) {
         return { response, body, endpoint };
       }
       if (response.status === 401 && state.sessionToken) {
-        state.sessionToken = "";
+        clearStoredSession();
         stopAutoRefresh();
         openLoginDialog();
       }
@@ -162,6 +171,96 @@ async function requestWithFailover(path, options = {}) {
 
 async function api(path, options = {}) {
   return (await requestWithFailover(path, options)).body;
+}
+
+/**
+ * 存储对象本身在某些环境里就是取不到的（裸 Node 跑策略测试、老浏览器的隐私模式）。
+ * 这里必须安静地返回空列表：这些读写都在 `requestWithFailover` 的 try 里被调用，
+ * 一旦抛出就会被当成「网络错误」，把一个正常的 401 变成一次多余的备用端点回退。
+ */
+function credentialStores() {
+  const found = [];
+  try {
+    found.push(sessionStorage);
+  } catch { /* 没有会话存储 */ }
+  try {
+    found.push(localStorage);
+  } catch { /* 没有本地存储 */ }
+  return found;
+}
+
+/**
+ * 会话令牌是 `base64url({sub,exp}).hmac`，签名密钥拿不到，但 payload 自己可读，
+ * 所以到期时间在前端就能判——省掉「带着过期令牌自动重连、然后弹一个看不懂的错」。
+ */
+function sessionExpiry(token) {
+  const dot = String(token).lastIndexOf(".");
+  if (dot <= 0) return 0;
+  try {
+    const b64 = String(token).slice(0, dot).replace(/-/g, "+").replace(/_/g, "/");
+    const decoded = JSON.parse(atob(b64.padEnd(Math.ceil(b64.length / 4) * 4, "=")));
+    return Number(decoded.exp) || 0;
+  } catch {
+    return 0;
+  }
+}
+
+/** 先读会话存储（只活到标签页关闭），再读本地存储（勾了「记住此设备」才会写进去）。 */
+function readStoredSession() {
+  for (const [store, remembered] of [[sessionStorage, false], [localStorage, true]]) {
+    let raw = null;
+    try {
+      raw = store.getItem(ADMIN_SESSION_STORAGE);
+    } catch {
+      continue;
+    }
+    if (!raw) continue;
+    let saved = null;
+    try {
+      saved = JSON.parse(raw);
+    } catch {
+      saved = null;
+    }
+    const token = String(saved?.token || "");
+    const exp = sessionExpiry(token);
+    if (!token || !exp || exp * 1000 <= Date.now()) {
+      try {
+        store.removeItem(ADMIN_SESSION_STORAGE);
+      } catch { /* 清不掉也只是下次再走一次登录框 */ }
+      continue;
+    }
+    return { token, exp, remembered, apiUrl: String(saved.apiUrl || ""), username: String(saved.username || "") };
+  }
+  return null;
+}
+
+function writeStoredSession(payload, remember) {
+  try {
+    if (remember) localStorage.setItem(ADMIN_SESSION_STORAGE, payload);
+    else sessionStorage.setItem(ADMIN_SESSION_STORAGE, payload);
+  } catch { /* 存不下就退回「每次打开都要登录」，功能不坏 */ }
+}
+
+function storeSession() {
+  if (!state.sessionToken) return;
+  const remember = Boolean($("#remember-admin-key")?.checked);
+  const payload = JSON.stringify({ token: state.sessionToken, apiUrl: state.apiUrl, username: state.adminUsername, exp: sessionExpiry(state.sessionToken) });
+  try {
+    // 两边只留一份，否则「记住」和「不记住」来回切一次会留下一个更早的会话等着被自动恢复。
+    sessionStorage.removeItem(ADMIN_SESSION_STORAGE);
+    localStorage.removeItem(ADMIN_SESSION_STORAGE);
+  } catch { /* 同上 */ }
+  writeStoredSession(payload, remember);
+}
+
+function clearStoredSession() {
+  state.sessionToken = "";
+  state.adminUsername = "";
+  for (const store of [sessionStorage, localStorage]) {
+    try {
+      store.removeItem(ADMIN_SESSION_STORAGE);
+    } catch { /* 同上 */ }
+  }
 }
 
 function openLoginDialog() {
@@ -194,6 +293,8 @@ async function login(event) {
     });
     if (!response.ok || !body.sessionToken) throw new Error(body?.error?.message || `登录失败（${response.status}）`);
     state.sessionToken = body.sessionToken;
+    state.adminUsername = username;
+    storeSession();
     $("#admin-password").value = "";
     $("#admin-login-dialog").close();
     await connect();
@@ -207,6 +308,7 @@ async function login(event) {
 }
 
 async function connect() {
+  if (state.connecting) return;
   const url = $("#api-url").value.trim().replace(/\/$/, "");
   const key = $("#admin-key").value.trim();
   // 判断必须用「刚填进来的这把密钥」，而不是 state 里那一份：以前这里在赋值之前就调用
@@ -224,16 +326,23 @@ async function connect() {
   const button = $("#connect-button");
   button.disabled = true;
   button.textContent = "连接中…";
+  state.connecting = true;
   try {
     const health = await requestWithFailover("/health", { method: "GET" });
     if (!health.body.ok) throw new Error("授权服务或数据库尚未就绪");
-    await loadDashboard({ refreshSupabaseHealth: true });
-    await loadPrices({ force: true });
-    await loadNotice({ force: true }).catch((error) =>
-      setNoticeStatus(`公告读取失败：${error.message}`, true)
-    );
-    await loadSeries({ force: true });
+    try {
+      localStorage.setItem(API_URL_STORAGE, state.apiUrl);
+    } catch { /* 存不下也只是下次回到默认端点 */ }
+    // 到这一步连接已经成立了。以前要等下面三块面板全填完才亮绿，于是「已连接」的等待时间里
+    // 混着 auth/health 那一秒——那只是一个状态探针，不该决定连接算不算成功。
     setConnection(true, "已连接");
+    await Promise.all([
+      loadDashboard({ refreshSupabaseHealth: true, forceSeries: true }),
+      loadPrices({ force: true }),
+      loadNotice({ force: true }).catch((error) =>
+        setNoticeStatus(`公告读取失败：${error.message}`, true)
+      ),
+    ]);
     startAutoRefresh();
     showToast("已连接到授权服务");
   } catch (error) {
@@ -241,16 +350,17 @@ async function connect() {
     setConnection(false, "连接失败");
     showToast(error.message, true);
   } finally {
+    state.connecting = false;
     button.disabled = false;
     button.textContent = "连接";
   }
 }
 
-async function loadDashboard({ refreshSupabaseHealth = false } = {}) {
+async function loadDashboard({ refreshSupabaseHealth = false, forceSeries = false } = {}) {
   if (state.refreshing) return null;
   state.refreshing = true;
   try {
-    const [stats] = await Promise.all([loadStats(refreshSupabaseHealth), loadLicenses(), loadOrders(), loadDevices(), loadSeries()]);
+    const [stats] = await Promise.all([loadStats(refreshSupabaseHealth), loadLicenses(), loadOrders(), loadDevices(), loadSeries({ force: forceSeries })]);
     return stats;
   } finally {
     state.refreshing = false;
@@ -276,11 +386,23 @@ async function loadSupabaseHealth(force = false) {
   return health;
 }
 
+function applySupabaseHealth(supabase) {
+  const supabasePresentation = supabaseHealthPresentation(supabase);
+  $("#service-supabase").textContent = supabasePresentation.databaseText;
+  $("#service-supabase").className = supabasePresentation.databaseClassName;
+  $("#service-catalog").textContent = supabasePresentation.catalogText;
+  $("#service-catalog").className = supabasePresentation.catalogClassName;
+  $("#service-state").textContent = supabasePresentation.overallText;
+  $("#service-state").className = `state-label ${supabasePresentation.overallClassName}`;
+  renderHealth(supabasePresentation, state.lastMaintenance);
+}
+
 async function loadStats(refreshSupabaseHealth = false) {
-  const [response, supabase] = await Promise.all([
-    api("/v1/admin/stats"),
-    loadSupabaseHealth(refreshSupabaseHealth),
-  ]);
+  // auth/health 实测每次 ≈1.0s（它顺带查库和私有换肤目录状态），而 admin-api 的统计数据只要 0.2s。
+  // 它只服务服务页那三行状态标签，所以让它自己在后台跑、探到再补——不然整块连接被一个探针拖着。
+  const healthPromise = loadSupabaseHealth(refreshSupabaseHealth);
+  healthPromise.then(applySupabaseHealth).catch(() => {});
+  const response = await api("/v1/admin/stats");
   const stats = response.licenses || {};
   $("#metric-total").textContent = ["unused", "active", "expired", "revoked"].reduce((sum, key) => sum + Number(stats[key] || 0), 0);
   $("#metric-unused").textContent = Number(stats.unused || 0);
@@ -288,20 +410,14 @@ async function loadStats(refreshSupabaseHealth = false) {
   $("#metric-devices").textContent = Number(response.activeDevices || 0);
   $("#service-worker").textContent = "在线";
   $("#service-db").textContent = "已连接";
-  const supabasePresentation = supabaseHealthPresentation(supabase);
-  $("#service-supabase").textContent = supabasePresentation.databaseText;
-  $("#service-supabase").className = supabasePresentation.databaseClassName;
-  $("#service-catalog").textContent = supabasePresentation.catalogText;
-  $("#service-catalog").className = supabasePresentation.catalogClassName;
   $("#service-environment").textContent = "staging";
   $("#service-cleanup").textContent = describeMaintenanceRun(response.maintenance);
   $("#service-cleanup").className = maintenanceToneClass(response.maintenance);
   $("#service-request").textContent = new Date().toLocaleTimeString("zh-CN");
-  $("#service-state").textContent = supabasePresentation.overallText;
-  $("#service-state").className = `state-label ${supabasePresentation.overallClassName}`;
   state.lastMaintenance = response.maintenance || null;
   renderAllocation(stats);
-  renderHealth(supabasePresentation, response.maintenance);
+  // 服务页那三行和「需要留意」那条提示都要看健康探针：先用手里已有的结果画一版，探针回来再补。
+  applySupabaseHealth(state.supabaseHealth);
   renderStamp();
   return response;
 }
@@ -1375,6 +1491,10 @@ function escapeAttribute(value) { return escapeHtml(value).replace(/`/g, "&#96;"
 state.adminKey = localStorage.getItem(ADMIN_KEY_STORAGE) || "";
 $("#admin-key").value = state.adminKey;
 $("#remember-admin-key").checked = Boolean(state.adminKey);
+try {
+  const savedApiUrl = localStorage.getItem(API_URL_STORAGE);
+  if (savedApiUrl) $("#api-url").value = savedApiUrl;
+} catch { /* 读不到就用页面里写死的默认端点 */ }
 /**
  * 定时任务还在不在跑，必须一眼看得出来。
  * 上一轮就是教训：授权 Worker 的 cron 从 9 月 25 日起静默停止，两侧各堆了十几条过期卡密，
@@ -1842,7 +1962,38 @@ document.addEventListener("visibilitychange", () => {
     loadDashboard().catch(() => setConnection(false, "刷新失败"));
   }
 });
-openLoginDialog();
+/**
+ * 开台就把手里的凭据用上：有未过期的会话（或记住的管理员密钥）就直接连，不再拦一道登录框。
+ * 会话令牌默认只存在 sessionStorage —— 刷新页面还在、关掉标签页就没了；勾了「记住此设备」
+ * 才落到 localStorage，跟着令牌自己的 8 小时到期走。
+ */
+function restoreSession() {
+  const saved = readStoredSession();
+  if (!saved) return false;
+  state.sessionToken = saved.token;
+  state.adminUsername = saved.username;
+  if (saved.apiUrl) {
+    state.apiUrl = saved.apiUrl;
+    $("#api-url").value = saved.apiUrl;
+  }
+  return true;
+}
+
+function logout() {
+  clearStoredSession();
+  state.adminKey = "";
+  $("#admin-key").value = "";
+  $("#remember-admin-key").checked = false;
+  localStorage.removeItem(ADMIN_KEY_STORAGE);
+  stopAutoRefresh();
+  setConnection(false, "未连接");
+  openLoginDialog();
+}
+
+restoreSession();
+if (hasAdminAccess()) connect();
+else openLoginDialog();
+$("#logout-button").addEventListener("click", logout);
 
 // Keep a previously loaded copy available when the static host is rate-limited
 // or temporarily unreachable. The worker handles navigation fallback; this
