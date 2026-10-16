@@ -1519,7 +1519,12 @@ function describeMaintenanceRun(run) {
   const minutes = Math.max(0, Math.round((Date.now() - lastRunMs) / 60000));
   const when = minutes < 90 ? `${minutes} 分钟前` : `${Math.round(minutes / 60)} 小时前`;
   const remaining = Number(run.remainingExpired || 0);
-  return `${when} · 删 ${Number(run.deletedCount || 0)} 条${remaining ? ` · 仍剩 ${remaining}` : ""}`;
+  // 订单侧那两个数也要露出来：这张留痕存在的全部理由就是「作业还在跑」能从外部看出来，
+  // 只报卡密那一半，等于订单退役哪天停跑了照样看不出来。
+  const ordersExpired = Number(run.ordersExpired || 0);
+  const ordersDeleted = Number(run.ordersDeleted || 0);
+  const orders = ordersExpired || ordersDeleted ? ` · 订单翻期 ${ordersExpired} · 退役 ${ordersDeleted}` : "";
+  return `${when} · 删 ${Number(run.deletedCount || 0)} 条${remaining ? ` · 仍剩 ${remaining}` : ""}${orders}`;
 }
 
 /** 超过 26 小时没有运行记录 = 每小时一次的清理停了；出错也照样标红，别让它安静地烂掉。 */
