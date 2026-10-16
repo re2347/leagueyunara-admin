@@ -2,7 +2,7 @@
 // ⚠️ 改完任何一个资产（含 styles.css 的颜色）都必须把这个号往上加一位。
 // 2026-10-16 就是漏了这一步：色板从绿改成图标紫之后，用户刷到的仍是缓存里的绿色 CSS，
 // 而 HTML 已经是新的，两者一错开就表现为"按钮没反应 + 颜色没变"。
-const CACHE_NAME = "yunara-admin-static-v15";
+const CACHE_NAME = "yunara-admin-static-v16";
 const PRIMARY_HOST = "wind-xber.upma.site";
 const FALLBACK_PAGE = "https://re2347.github.io/leagueyunara-admin/";
 const STATIC_ASSETS = [

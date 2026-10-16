@@ -223,9 +223,9 @@
             <section class="card query-card" aria-labelledby="license-query-title">
               <h2 class="sr-only" id="license-query-title">库存查询条件</h2>
               <div class="query-form">
-                <label class="query-field"><span>状态</span><select id="status-filter"><option value="">全部状态</option><option value="unused">未使用</option><option value="active">已激活</option><option value="revoked">已撤销</option></select></label>
-                <label class="query-field narrow-field"><span>套餐天数</span><input id="plan-days-filter" type="number" min="1" max="36500" inputmode="numeric" placeholder="例如 30" /></label>
-                <label class="query-field wide-field"><span>关键词</span><input id="search-filter" type="search" placeholder="激活码前缀 / 完整卡密 / 备注" maxlength="100" /></label>
+                <label class="query-field"><span>状态</span><select id="status-filter" autocomplete="off"><option value="">全部状态</option><option value="unused">未使用</option><option value="active">已激活</option><option value="revoked">已撤销</option></select></label>
+                <label class="query-field narrow-field"><span>套餐天数</span><input id="plan-days-filter" type="number" min="1" max="36500" inputmode="numeric" placeholder="例如 30" autocomplete="off" /></label>
+                <label class="query-field wide-field"><span>关键词</span><input id="search-filter" type="search" placeholder="激活码前缀 / 完整卡密 / 备注" maxlength="100" autocomplete="off" /></label>
                 <div class="query-actions">
                   <button id="search-button" class="button button-primary" type="button">查询</button>
                   <button id="license-reset" class="button button-quiet" type="button">重置</button>
@@ -244,7 +244,7 @@
                 <div class="toolbar__left">
                   <span id="selected-count" class="selected-count" aria-live="polite">未选择密钥</span>
                   <label class="toolbar__size"><span class="sr-only">每页条数</span>
-                    <select id="page-size"><option value="20">每页 20 条</option><option value="50">每页 50 条</option><option value="100">每页 100 条</option></select>
+                    <select id="page-size" autocomplete="off"><option value="20">每页 20 条</option><option value="50">每页 50 条</option><option value="100">每页 100 条</option></select>
                   </label>
                 </div>
                 <div class="toolbar__right">
@@ -262,7 +262,7 @@
                   <tbody id="license-table"><tr><td colspan="10" class="empty-state">连接后加载激活码</td></tr></tbody>
                 </table>
               </div>
-              <div class="table-footer"><span id="table-summary">--</span><div class="pagination" aria-label="分页"><button id="first-page" class="button button-quiet" type="button" disabled>首页</button><button id="previous-page" class="button button-quiet" type="button" disabled>上一页</button><label class="page-jump"><span class="sr-only">跳转页码</span><input id="page-input" type="number" min="1" value="1" inputmode="numeric" aria-label="跳转页码" disabled /></label><button id="go-to-page" class="button button-quiet" type="button" disabled>跳转</button><span id="page-label">第 1 / 1 页</span><button id="next-page" class="button button-quiet" type="button" disabled>下一页</button><button id="last-page" class="button button-quiet" type="button" disabled>尾页</button></div></div>
+              <div class="table-footer"><span id="table-summary">--</span><div class="pagination" aria-label="分页"><button id="first-page" class="button button-quiet" type="button" disabled>首页</button><button id="previous-page" class="button button-quiet" type="button" disabled>上一页</button><label class="page-jump"><span class="sr-only">跳转页码</span><input id="page-input" type="number" min="1" value="1" inputmode="numeric" aria-label="跳转页码" disabled autocomplete="off" /></label><button id="go-to-page" class="button button-quiet" type="button" disabled>跳转</button><span id="page-label">第 1 / 1 页</span><button id="next-page" class="button button-quiet" type="button" disabled>下一页</button><button id="last-page" class="button button-quiet" type="button" disabled>尾页</button></div></div>
             </section>
           </section>
 
@@ -271,8 +271,8 @@
             <section class="card query-card" aria-labelledby="device-query-title">
               <h2 class="sr-only" id="device-query-title">设备查询条件</h2>
               <div class="query-form">
-                <label class="query-field"><span>设备状态</span><select id="device-status-filter"><option value="">全部状态</option><option value="active">在用</option><option value="unbound">已解绑</option><option value="revoked">已撤销</option></select></label>
-                <label class="query-field wide-field"><span>关键词</span><input id="device-search" type="search" placeholder="设备标识 / 卡密前缀 / 客户端版本" maxlength="100" /></label>
+                <label class="query-field"><span>设备状态</span><select id="device-status-filter" autocomplete="off"><option value="">当前绑定</option><option value="active">在用</option><option value="unbound">已解绑</option><option value="revoked">已撤销</option></select></label>
+                <label class="query-field wide-field"><span>关键词</span><input id="device-search" type="search" placeholder="设备标识 / 完整密钥 / 卡密前缀 / 备注 / 客户端版本" maxlength="100" autocomplete="off" /></label>
                 <div class="query-actions">
                   <button id="device-search-button" class="button button-primary" type="button">查询</button>
                   <button id="device-reset" class="button button-quiet" type="button">重置</button>
@@ -284,13 +284,13 @@
               <div class="card__head">
                 <div>
                   <h2 id="devices-title">设备与租约</h2>
-                  <p class="card__desc">一台设备绑定一张卡密；租约是客户端每 30 分钟续一次的短期凭证。这里只读，解绑走卡密那一侧的动作。</p>
+                  <p class="card__desc">一台设备绑定一张卡密；租约是客户端每 30 分钟续一次的短期凭证。这里只读，解绑走卡密那一侧的动作。默认只列<strong>每张卡密当前绑定的那台</strong>——解绑与「重置设备绑定」留下的历史行不再占位，要查它们就在设备状态里显式选「已解绑」或「已撤销」。</p>
                 </div>
               </div>
               <div class="toolbar" aria-label="设备工具栏">
                 <div class="toolbar__left">
                   <label class="toolbar__size"><span class="sr-only">每页条数</span>
-                    <select id="device-page-size"><option value="20">每页 20 条</option><option value="50">每页 50 条</option><option value="100">每页 100 条</option></select>
+                    <select id="device-page-size" autocomplete="off"><option value="20">每页 20 条</option><option value="50">每页 50 条</option><option value="100">每页 100 条</option></select>
                   </label>
                 </div>
                 <div class="toolbar__right">
@@ -301,8 +301,8 @@
               <div class="table-wrap">
                 <table>
                   <caption class="sr-only">设备与租约：按最近在线排序，可对在用设备执行解绑。</caption>
-                  <thead><tr><th>设备标识</th><th>关联卡密</th><th>设备状态</th><th>卡密状态</th><th>首次出现</th><th>最近在线</th><th>客户端版本</th><th>系统版本</th><th>租约到期</th><th class="actions-column">操作</th></tr></thead>
-                  <tbody id="device-table"><tr><td colspan="10" class="empty-state">连接后加载设备</td></tr></tbody>
+                  <thead><tr><th>设备标识</th><th>关联卡密</th><th>设备状态</th><th>卡密状态</th><th>首次出现</th><th>最近在线</th><th>客户端版本</th><th>租约到期</th><th class="actions-column">操作</th></tr></thead>
+                  <tbody id="device-table"><tr><td colspan="9" class="empty-state">连接后加载设备</td></tr></tbody>
                 </table>
               </div>
               <div class="table-footer"><span id="device-summary">--</span><div class="pagination" aria-label="设备分页"><button id="device-previous-page" class="button button-quiet" type="button" disabled>上一页</button><span id="device-page-label">第 1 / 1 页</span><button id="device-next-page" class="button button-quiet" type="button" disabled>下一页</button></div></div>
@@ -321,7 +321,7 @@
               <form id="create-form" class="create-form">
                 <label class="field plan-field">
                   <span>卡类型</span>
-                  <select id="plan-days">
+                  <select id="plan-days" autocomplete="off">
                     <option value="1">1 天卡</option>
                     <option value="7">7 天卡</option>
                     <option value="30">30 天卡</option>
@@ -330,15 +330,15 @@
                 </label>
                 <label id="custom-plan-days-field" class="field days-field" hidden>
                   <span>自定义天数</span>
-                  <input id="custom-plan-days" type="number" min="1" max="36500" inputmode="numeric" placeholder="1-36500" />
+                  <input id="custom-plan-days" type="number" min="1" max="36500" inputmode="numeric" placeholder="1-36500" autocomplete="off" />
                 </label>
                 <label class="field count-field">
                   <span>生成数量</span>
-                  <input id="license-count" type="number" value="1" min="1" max="100" inputmode="numeric" />
+                  <input id="license-count" type="number" value="1" min="1" max="100" inputmode="numeric" autocomplete="off" />
                 </label>
                 <label class="field note-field">
                   <span>备注 <em>可选</em></span>
-                  <input id="license-note" type="text" maxlength="500" placeholder="例如：首批内测用户" />
+                  <input id="license-note" type="text" maxlength="500" placeholder="例如：首批内测用户" autocomplete="off" />
                 </label>
                 <button class="button button-primary create-button" type="submit">生成激活码</button>
               </form>
@@ -364,8 +364,8 @@
             <section class="card query-card" aria-labelledby="order-query-title">
               <h2 class="sr-only" id="order-query-title">订单查询条件</h2>
               <div class="query-form">
-                <label class="query-field"><span>订单状态</span><select id="order-status-filter"><option value="">全部状态</option><option value="pending">待支付</option><option value="processing">处理中</option><option value="paid">已支付</option><option value="delivered">已领取</option><option value="expired">已过期</option></select></label>
-                <label class="query-field wide-field"><span>关键词</span><input id="order-search" type="search" placeholder="订单号 / 联系方式 / 金额(分)" maxlength="100" /></label>
+                <label class="query-field"><span>订单状态</span><select id="order-status-filter" autocomplete="off"><option value="">全部状态</option><option value="pending">待支付</option><option value="processing">处理中</option><option value="paid">已支付</option><option value="delivered">已领取</option><option value="expired">已过期</option></select></label>
+                <label class="query-field wide-field"><span>关键词</span><input id="order-search" type="search" placeholder="订单号 / 联系方式 / 金额(分)" maxlength="100" autocomplete="off" /></label>
                 <div class="query-actions">
                   <button id="order-search-button" class="button button-primary" type="button">查询</button>
                   <button id="order-reset" class="button button-quiet" type="button">重置</button>
@@ -383,7 +383,7 @@
               <div class="toolbar" aria-label="订单工具栏">
                 <div class="toolbar__left">
                   <label class="toolbar__size"><span class="sr-only">每页条数</span>
-                    <select id="order-page-size"><option value="20">每页 20 条</option><option value="50">每页 50 条</option><option value="100">每页 100 条</option></select>
+                    <select id="order-page-size" autocomplete="off"><option value="20">每页 20 条</option><option value="50">每页 50 条</option><option value="100">每页 100 条</option></select>
                   </label>
                 </div>
                 <div class="toolbar__right">
@@ -440,10 +440,10 @@
               </div>
               <div class="notice-form">
                 <div class="notice-head-row">
-                  <label class="notice-cell"><span>级别（severity）</span><select id="notice-severity"><option value="low">low · 静默不提示</option><option value="medium">medium · 摘要 + 红点</option><option value="high">high · 自动弹窗</option></select></label>
+                  <label class="notice-cell"><span>级别（severity）</span><select id="notice-severity" autocomplete="off"><option value="low">low · 静默不提示</option><option value="medium">medium · 摘要 + 红点</option><option value="high">high · 自动弹窗</option></select></label>
                   <label class="notice-cell"><span>标题（summary，必填，显示在标题栏）</span><input id="notice-summary" type="text" maxlength="200" autocomplete="off" /><em id="notice-current-summary">--</em></label>
                 </div>
-                <label class="notice-content"><span>正文（Markdown，弹窗内渲染）</span><textarea id="notice-content" rows="9" spellcheck="false"></textarea></label>
+                <label class="notice-content"><span>正文（Markdown，弹窗内渲染）</span><textarea id="notice-content" rows="9" spellcheck="false" autocomplete="off"></textarea></label>
                 <div class="price-foot">
                   <div class="price-notes" id="notice-notes" role="status" aria-live="polite">
                     <span id="notice-meta">未读取</span>
@@ -540,7 +540,7 @@
         </dl>
         <label class="field extension-days-field">
           <span>增加天数</span>
-          <input id="extend-license-days" type="number" min="1" max="36500" value="30" inputmode="numeric" required />
+          <input id="extend-license-days" type="number" min="1" max="36500" value="30" inputmode="numeric" required autocomplete="off" />
         </label>
         <div class="extension-presets" aria-label="快速选择增加天数">
           <button class="button button-quiet" type="button" data-extend-days="1">+1 天</button>

@@ -147,6 +147,7 @@ async function requestWithFailover(path, options = {}) {
   };
   let lastBody = {};
   let lastStatus = 0;
+  let sessionRejected = false;
   for (const endpoint of pinnedEndpoint ? [pinnedEndpoint] : apiCandidates()) {
     try {
       const response = await fetch(`${endpoint}${path}`, { cache: "no-store", ...fetchOptions, headers });
@@ -157,17 +158,26 @@ async function requestWithFailover(path, options = {}) {
         state.apiUrl = endpoint;
         return { response, body, endpoint };
       }
-      if (response.status === 401 && state.sessionToken) {
-        clearStoredSession();
-        stopAutoRefresh();
-        openLoginDialog();
-      }
+      if (response.status === 401 && state.sessionToken) sessionRejected = true;
       if (!shouldTryAdminApiFallback({ status: response.status })) break;
     } catch (error) {
       lastBody = {};
       lastStatus = 0;
       if (!shouldTryAdminApiFallback({ status: 0, networkError: true })) break;
     }
+  }
+  if (sessionRejected) {
+    // 会话失效这三步必须留在 try 外面：它们原来在循环体的 try 里，任何一次抛出（存储被禁用）
+    // 都会被下面那个 catch 认成「网络错误」，于是一个正常的 401 反而多打一次备用端点。
+    // 顺序也不能反：先停轮询、先把登录框摆出来，最后才去清存储——清不掉是环境问题，
+    // 不该让人对着一个已经什么都不显示的页面等凭据。
+    try {
+      state.sessionToken = "";
+      state.adminUsername = "";
+      stopAutoRefresh();
+      openLoginDialog();
+      clearStoredSession();
+    } catch { /* 清理失败也要把真实错误抛给调用方，别改判成掉线 */ }
   }
   throw new Error(lastBody?.error?.message || `请求失败（${lastStatus || "网络错误"}）`);
 }
@@ -187,7 +197,7 @@ function credentialStores() {
     found.push(sessionStorage);
   } catch { /* 没有会话存储 */ }
   try {
-    void 0 /* 镜像：与买家页同源，会话只留 sessionStorage */;
+    void 0 /* 别名之后这里本来就是 sessionStorage，不再推第二次 */;
   } catch { /* 没有本地存储 */ }
   return found;
 }
@@ -210,7 +220,7 @@ function sessionExpiry(token) {
 
 /** 先读会话存储（只活到标签页关闭），再读本地存储（勾了「记住此设备」才会写进去）。 */
 function readStoredSession() {
-  for (const [store, remembered] of [[sessionStorage, false], [localStorage, true]]) {
+  for (const store of credentialStores()) {
     let raw = null;
     try {
       raw = store.getItem(ADMIN_SESSION_STORAGE);
@@ -232,7 +242,7 @@ function readStoredSession() {
       } catch { /* 清不掉也只是下次再走一次登录框 */ }
       continue;
     }
-    return { token, exp, remembered, apiUrl: String(saved.apiUrl || ""), username: String(saved.username || "") };
+    return { token, exp, apiUrl: String(saved.apiUrl || ""), username: String(saved.username || "") };
   }
   return null;
 }
@@ -259,7 +269,7 @@ function storeSession() {
 function clearStoredSession() {
   state.sessionToken = "";
   state.adminUsername = "";
-  for (const store of [sessionStorage, localStorage]) {
+  for (const store of credentialStores()) {
     try {
       store.removeItem(ADMIN_SESSION_STORAGE);
     } catch { /* 同上 */ }
@@ -823,7 +833,7 @@ async function loadDevices() {
   } catch (error) {
     state.devices.items = [];
     state.devices.total = 0;
-    $("#device-table").innerHTML = `<tr><td colspan="10" class="empty-state">${escapeHtml(error.message || "设备读取失败")}（设备端点需与界面一起部署）</td></tr>`;
+    $("#device-table").innerHTML = `<tr><td colspan="9" class="empty-state">${escapeHtml(error.message || "设备读取失败")}（设备端点需与界面一起部署）</td></tr>`;
     updateDevicePager();
     return;
   }
@@ -846,7 +856,7 @@ function formatAgo(value) {
 function renderDevicesTable() {
   const table = $("#device-table");
   if (!state.devices.items.length) {
-    table.innerHTML = '<tr><td colspan="10" class="empty-state">没有符合条件的设备</td></tr>';
+    table.innerHTML = '<tr><td colspan="9" class="empty-state">没有符合条件的设备</td></tr>';
     return;
   }
   table.innerHTML = state.devices.items.map((item) => {
@@ -867,7 +877,6 @@ function renderDevicesTable() {
       <td class="time-cell">${formatDate(item.firstSeenAt)}</td>
       <td class="time-cell">${escapeHtml(formatAgo(item.lastSeenAt))}</td>
       <td>${escapeHtml(item.appVersion || "--")}</td>
-      <td>${escapeHtml(item.osVersion || "--")}</td>
       <td class="time-cell">${escapeHtml(leaseText)}</td>
       <td><div class="row-actions">${action}<button type="button" class="button button-quiet" data-device-action="find-license" data-prefix="${escapeAttribute(item.codePrefix || "")}">按前缀查卡密</button></div></td>
     </tr>`;
