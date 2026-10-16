@@ -110,21 +110,15 @@ function configuredApiUrl() {
 }
 
 /**
- * 只在 Cloudflare Worker 实现、Supabase 线尚未提供的路由。
+ * 公告与版本两条路由也已由 Supabase 线代理到 Worker 主源，所以不再按路径钉端点。
  *
- * 不钉住的话，每次请求都会先被 Supabase 的 `NOT_IMPLEMENTED` 501 弹回来再打 Worker，
- * 白跑一个来回；从代理/VPN 出口访问时，多一次 Worker 请求就多一次被 Cloudflare
- * 托管规则拦下的机会。
+ * 浏览器到 Cloudflare 那一次握手实测 1 秒级（`CF-RAY` 落在阿姆斯特丹），而 Supabase
+ * 到授权 Worker 是机房到机房、几十毫秒；两条线都由 `api-failover-policy.js` 在
+ * 5xx/网络错误时互相兜底，所以先打哪条只影响快慢，不影响成败。
  */
-const WORKER_ONLY_ROUTES = ["/v1/admin/app-notice", "/v1/admin/app-release"];
-
-function preferredEndpoint(path) {
-  return WORKER_ONLY_ROUTES.some((route) => path.startsWith(route)) ? CF_API : SUPABASE_API;
-}
-
-function apiCandidates(path = "") {
+function apiCandidates() {
   const configured = configuredApiUrl();
-  const defaults = [preferredEndpoint(path), state.apiUrl, CF_API, SUPABASE_API];
+  const defaults = [SUPABASE_API, state.apiUrl, CF_API];
   const candidates = configured && configured !== SUPABASE_API && configured !== CF_API
     ? [configured]
     : defaults;
@@ -141,7 +135,7 @@ async function requestWithFailover(path, options = {}) {
   };
   let lastBody = {};
   let lastStatus = 0;
-  for (const endpoint of pinnedEndpoint ? [pinnedEndpoint] : apiCandidates(path)) {
+  for (const endpoint of pinnedEndpoint ? [pinnedEndpoint] : apiCandidates()) {
     try {
       const response = await fetch(`${endpoint}${path}`, { cache: "no-store", ...fetchOptions, headers });
       const body = await response.json().catch(() => ({}));
@@ -1203,6 +1197,9 @@ async function updateLicenseNote(input) {
     if (selected) selected.note = savedNote || null;
     const current = state.currentItems.find((item) => item.license_id === id);
     if (current) current.note = savedNote || null;
+    // 仪表盘的「近期激活码」读的就是这一批数据，改完备注要立刻跟着重画，
+    // 否则要等下一次 15 秒自动刷新才对得上。
+    renderRecent();
     showToast("备注已保存");
   } catch (error) {
     input.value = previous;
