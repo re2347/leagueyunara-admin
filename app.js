@@ -1761,7 +1761,11 @@ async function saveNotice() {
     } else if (body.staticFallback === "skipped") {
       setNoticeStatus("静态备源未配置（缺 SUPABASE_SYNC_URL / AUTH_SYNC_SECRET）", true);
     } else {
-      setNoticeStatus("静态备源发布失败：连不上 Cloudflare 的用户这次看不到这条", true);
+      // 主源已经保存成功，这里只报备源。带上服务端回传的具体原因（如 STATIC_NOTICE_INVALID），
+      // 否则「公告超出上限」和「存储写失败」在界面上是同一句话，只能去翻函数日志。
+      const raw = typeof body.staticFallback === "string" ? body.staticFallback : "";
+      const reason = raw.startsWith("failed:") ? raw.slice("failed:".length) : "";
+      setNoticeStatus(`静态备源发布失败${reason ? `（${reason}）` : ""}：连不上 Cloudflare 的用户这次看不到这条`, true);
     }
   } catch (error) {
     showToast(error.message, true);
