@@ -2,6 +2,7 @@ import { shouldRefreshSupabaseHealth, supabaseHealthPresentation } from "./healt
 import { shouldTryAdminApiFallback } from "./api-failover-policy.js";
 import { shouldRedirectToStaticFallback } from "./host-failover-policy.js";
 import { shouldDeferLicenseRefresh } from "./note-refresh-policy.js";
+import { adminKeyFieldAfterConnect, adminKeyPlaceholder, resolveConnectKey, shouldOfferClearAdminKey } from "./admin-key-policy.js";
 import { initView } from "./nav.js";
 import { renderDonut, renderLineChart } from "./series.js";
 import { initMask } from "./mask.js";
@@ -323,7 +324,8 @@ async function login(event) {
 async function connect() {
   if (state.connecting) return;
   const url = $("#api-url").value.trim().replace(/\/$/, "");
-  const key = $("#admin-key").value.trim();
+  // 输入框不再回显已存的密钥，所以"没输入新值"必须解释成"沿用已存的那把"，而不是"清空它"。
+  const key = resolveConnectKey($("#admin-key").value, state.adminKey);
   // 判断必须用「刚填进来的这把密钥」，而不是 state 里那一份：以前这里在赋值之前就调用
   // hasAdminAccess()，于是「只填 ADMIN_API_KEY、不走账号登录」这条路一点都走不通。
   const authorized = Boolean(state.sessionToken || key);
@@ -335,7 +337,9 @@ async function connect() {
   state.apiUrl = url || SUPABASE_API;
   state.adminKey = key;
   if ($("#remember-admin-key").checked && key) localStorage.setItem(ADMIN_KEY_STORAGE, key);
-  else if (!key) localStorage.removeItem(ADMIN_KEY_STORAGE);
+  // 取消勾选 = 不再落盘，并且把之前存的那份撤掉（本次会话照用 state 里的密钥）。
+  // 原来这里只在"没密钥"时才 removeItem，于是取消勾选根本撤不掉已存的密钥。
+  else if (!$("#remember-admin-key").checked) localStorage.removeItem(ADMIN_KEY_STORAGE);
   const button = $("#connect-button");
   button.disabled = true;
   button.textContent = "连接中…";
@@ -349,6 +353,10 @@ async function connect() {
     // 到这一步连接已经成立了。以前要等下面三块面板全填完才亮绿，于是「已连接」的等待时间里
     // 混着 auth/health 那一秒——那只是一个状态探针，不该决定连接算不算成功。
     setConnection(true, "已连接");
+    // 连接已成立、密钥也进了 state（请求头照带）——把刚输入的明文从 DOM 里抹掉，别让它继续躺在
+    // 输入框里等着被"显示密码"或被密码管理器提示"保存这个密码"。
+    $("#admin-key").value = adminKeyFieldAfterConnect();
+    syncAdminKeyField();
     await Promise.all([
       loadDashboard({ refreshSupabaseHealth: true, forceSeries: true }),
       loadPrices({ force: true }),
@@ -1500,9 +1508,39 @@ function escapeHtml(value) {
 
 function escapeAttribute(value) { return escapeHtml(value).replace(/`/g, "&#96;"); }
 
-state.adminKey = localStorage.getItem(ADMIN_KEY_STORAGE) || "";
-$("#admin-key").value = state.adminKey;
-$("#remember-admin-key").checked = Boolean(state.adminKey);
+/** 读一次"本机到底存没存密钥"。存储可能被隐私模式拒读，读不到就当没存。 */
+function readPersistedAdminKey() {
+  try {
+    return localStorage.getItem(ADMIN_KEY_STORAGE) || "";
+  } catch {
+    return "";
+  }
+}
+
+state.adminKey = readPersistedAdminKey();
+// 已存的密钥**不写回输入框**：那是 `type=password`，但浏览器（Edge/Chrome）自带"显示密码"的
+// 小眼睛，写回去就等于把长期密钥摆在一次点击之外没有防护的地方（本机预览能存进 localStorage，
+// 那里真的看得见）。界面只说"存没存"，密钥继续只在内存与存储里，请求头照带。
+// 判据抽在 admin-key-policy.js，配套测试钉住"任何要写进 DOM 的值都不含密钥"。
+function syncAdminKeyField() {
+  const field = $("#admin-key");
+  if (field) field.value = "";
+  // 提示与复选框说的是「有没有落盘」，不是「本次会话在不在用」：取消勾选后密钥仍然在当前会话里
+  // 有效，但界面上必须显示"未保存"，否则下次打开才发现没了。
+  const persisted = shouldOfferClearAdminKey(readPersistedAdminKey());
+  const hint = $("#admin-key-hint");
+  if (hint) hint.hidden = !persisted;
+  if (field) field.placeholder = adminKeyPlaceholder(persisted ? readPersistedAdminKey() : "");
+  const remember = $("#remember-admin-key");
+  if (remember) remember.checked = persisted;
+}
+syncAdminKeyField();
+$("#clear-admin-key")?.addEventListener("click", () => {
+  localStorage.removeItem(ADMIN_KEY_STORAGE);
+  state.adminKey = "";
+  syncAdminKeyField();
+  showToast("已清除本机保存的管理员密钥");
+});
 try {
   const savedApiUrl = localStorage.getItem(API_URL_STORAGE);
   if (savedApiUrl) $("#api-url").value = savedApiUrl;
@@ -2003,9 +2041,9 @@ function restoreSession() {
 function logout() {
   clearStoredSession();
   state.adminKey = "";
-  $("#admin-key").value = "";
   $("#remember-admin-key").checked = false;
   localStorage.removeItem(ADMIN_KEY_STORAGE);
+  syncAdminKeyField();
   stopAutoRefresh();
   setConnection(false, "未连接");
   openLoginDialog();
