@@ -17,7 +17,11 @@ export function resolveApiUrl({ typedUrl = "", storedUrl = "", defaultUrl = "" }
  * 429 刻意排除在外：它是管理台登录限流的返回码，而两条线各自独立计数。允许跨线重试就等于
  * 一条线锁定后自动领到另一条线的预算，而且管理员看到的是笼统的"登录失败"，
  * 不是"失败过多，请 15 分钟后再试"。
+ *
+ * 405 与 404 同属"这个端点根本不服务该路由"：例如把地址填成了已被改成只处理 GET 的旧
+ * `functions/v1/admin`（它现在是个跳转器），POST 一律 405。这不代表凭据有问题，也不该把
+ * 用户永久钉死在一个失效地址上 —— 实测就是这样登录不了。
  */
 export function shouldTryAdminApiFallback({ status = 0, networkError = false } = {}) {
-  return networkError || status === 404 || status === 408 || status >= 500;
+  return networkError || status === 404 || status === 405 || status === 408 || status >= 500;
 }

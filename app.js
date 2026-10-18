@@ -132,10 +132,14 @@ function configuredApiUrl() {
 function apiCandidates() {
   const configured = configuredApiUrl();
   const defaults = [SUPABASE_API, state.apiUrl, CF_API];
-  const candidates = configured && configured !== SUPABASE_API && configured !== CF_API
-    ? [configured]
-    : defaults;
-  return [...new Set(candidates.filter(Boolean).map((value) => value.replace(/\/$/, "")))];
+  // 「Supabase 优先」是钉死的顺序：只要地址是这两条已知线之一，就按默认顺序走，不因它被
+  // 填在输入框里而改变。只有**自填的非已知地址**（备用端点、本机预览、或填错了一次又被
+  // 会话存回来）才先试它一次，然后仍然退回两条已知线 —— 否则一个失效的自填地址会让整个
+  // 后台砖化，连"换一条线试试"的机会都没有（实测：地址填成已改成只处理 GET 的旧
+  // functions/v1/admin 跳转器，POST 一律 405，登录彻底不了）。
+  const isKnownEndpoint = !configured || configured === SUPABASE_API || configured === CF_API;
+  const ordered = isKnownEndpoint ? defaults : [configured, ...defaults];
+  return [...new Set(ordered.filter(Boolean).map((value) => value.replace(/\/$/, "")))];
 }
 
 async function requestWithFailover(path, options = {}) {
