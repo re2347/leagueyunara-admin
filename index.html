@@ -461,26 +461,31 @@
               <div class="card__head">
                 <div>
                   <h2 id="connection-title">连接到授权服务</h2>
-                  <p class="card__desc">登录一次之后，本页刷新会自动重连，不必再点「连接」；关掉标签页则回到登录框。勾选“记住此设备”会把这个会话和管理员密钥留到本机浏览器，直到会话到期（8 小时）。备用端点与本机预览都从这里改地址。</p>
+                  <p class="card__desc">登录一次之后，本页刷新会自动重连，不必再点「连接」；关掉标签页则回到登录框。勾选“记住此设备”会把这个会话和管理员密钥留到本机浏览器，直到会话到期（8 小时）。</p>
                 </div>
               </div>
-              <div class="auth-controls">
-                <label class="field compact-field">
-                  <span>管理员 API</span>
-                  <input id="api-url" type="url" value="https://kzqgphxrghdclkwneqyn.supabase.co/functions/v1/admin-api" autocomplete="url" />
-                </label>
-                <label class="field key-field">
-                  <span>管理员密钥 <em>可选</em></span>
-                  <input id="admin-key" type="password" placeholder="输入 ADMIN_API_KEY" autocomplete="off" />
-                </label>
-                <!-- 已存的密钥不回显（浏览器对 type=password 自带"显示密码"），所以这里只说明"存没存"并给撤销入口。判据见 admin-key-policy.js -->
-                <span id="admin-key-hint" class="auth-hint" hidden>本机已存管理员密钥<button id="clear-admin-key" class="button button-quiet" type="button">清除</button></span>
-                <button id="connect-button" class="button button-primary" type="button">连接</button>
-                <button id="logout-button" class="button button-quiet" type="button">退出登录</button>
-              </div>
-              <!-- 「记住此设备」必须和三个控件同层：它原来嵌在密钥那个 label 里面，
-                   多出来的一行把该字段整体顶高一档，而且 label 套 label 是非法 HTML。 -->
-              <label class="remember-key" hidden><input id="remember-admin-key" type="checkbox" /> <span>记住此设备</span></label>
+              <!-- 管理接口地址不再写死在这份公开静态页里：未登录的人不该在页面或源码中看到它。
+                   整组控件默认收起，只有要换备用端点或连本机预览时才展开自填；地址留空即走内置默认。 -->
+              <details id="connection-details">
+                <summary class="connection-summary">更改连接设置（备用端点 / 本机预览）</summary>
+                <div class="auth-controls">
+                  <label class="field compact-field">
+                    <span>管理员 API</span>
+                    <input id="api-url" type="url" placeholder="留空 = 内置默认授权服务" autocomplete="url" />
+                  </label>
+                  <label class="field key-field">
+                    <span>管理员密钥 <em>可选</em></span>
+                    <input id="admin-key" type="password" placeholder="输入 ADMIN_API_KEY" autocomplete="off" />
+                  </label>
+                  <!-- 已存的密钥不回显（浏览器对 type=password 自带"显示密码"），所以这里只说明"存没存"并给撤销入口。判据见 admin-key-policy.js -->
+                  <span id="admin-key-hint" class="auth-hint" hidden>本机已存管理员密钥<button id="clear-admin-key" class="button button-quiet" type="button">清除</button></span>
+                  <button id="connect-button" class="button button-primary" type="button">连接</button>
+                  <button id="logout-button" class="button button-quiet" type="button">退出登录</button>
+                </div>
+                <!-- 「记住此设备」必须和三个控件同层：它原来嵌在密钥那个 label 里面，
+                     多出来的一行把该字段整体顶高一档，而且 label 套 label 是非法 HTML。 -->
+                <label class="remember-key" hidden><input id="remember-admin-key" type="checkbox" /> <span>记住此设备</span></label>
+              </details>
             </section>
 
             <section class="card" aria-labelledby="service-title">

@@ -417,6 +417,10 @@ html[data-mask="sensitive"] .sensitive::after { content: "••••••"; l
 /* ------------------------------------------------------------------ 其余面板 */
 /* 连接设置已经收进「服务与连接」这一页，不再作为浮层压在每页顶部。 */
 .connect-card .auth-controls { display: flex; align-items: end; gap: 12px; flex-wrap: wrap; }
+/* 连接控件默认收起：未登录的人不该在页面上看到管理接口地址。 */
+.connection-summary { cursor: pointer; color: var(--muted); font-size: 13px; padding: 4px 0 10px; }
+.connection-summary:hover { color: var(--text); }
+#connection-details[open] .auth-controls { margin-top: 4px; }
 .connect-card .remember-key { margin-top: 10px; }
 .compact-field { min-width: 240px; flex: 1 1 240px; }
 .key-field { min-width: 220px; flex: 0 1 260px; }

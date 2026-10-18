@@ -1,5 +1,5 @@
 import { shouldRefreshSupabaseHealth, supabaseHealthPresentation } from "./health-policy.js";
-import { shouldTryAdminApiFallback } from "./api-failover-policy.js";
+import { resolveApiUrl, shouldTryAdminApiFallback } from "./api-failover-policy.js";
 import { shouldRedirectToStaticFallback } from "./host-failover-policy.js";
 import { shouldDeferLicenseRefresh } from "./note-refresh-policy.js";
 import { adminKeyFieldAfterConnect, adminKeyPlaceholder, resolveConnectKey, shouldOfferClearAdminKey } from "./admin-key-policy.js";
@@ -287,16 +287,18 @@ async function login(event) {
   event.preventDefault();
   const button = $("#login-submit");
   const error = $("#login-error");
-  const apiUrl = $("#api-url").value.trim().replace(/\/$/, "");
+  // 地址框默认是空的（未登录的人不该在页面上看到这个接口地址），所以留空要用内置默认，
+  // 而不是把"请输入 Worker 地址"甩给管理员。
+  const apiUrl = resolveApiUrl({ typedUrl: $("#api-url").value, storedUrl: state.apiUrl, defaultUrl: SUPABASE_API });
   const username = $("#admin-username").value.trim();
   const password = $("#admin-password").value;
   error.hidden = true;
-  if (!apiUrl || !username || !password) {
-    error.textContent = "请输入 Worker 地址、管理员账号和密码";
+  if (!username || !password) {
+    error.textContent = "请输入管理员账号和密码";
     error.hidden = false;
     return;
   }
-  state.apiUrl = apiUrl || SUPABASE_API;
+  state.apiUrl = apiUrl;
   button.disabled = true;
   button.textContent = "验证中…";
   try {
@@ -323,18 +325,19 @@ async function login(event) {
 
 async function connect() {
   if (state.connecting) return;
-  const url = $("#api-url").value.trim().replace(/\/$/, "");
+  // 同上：地址留空就用内置默认，不再要求手填。
+  const url = resolveApiUrl({ typedUrl: $("#api-url").value, storedUrl: state.apiUrl, defaultUrl: SUPABASE_API });
   // 输入框不再回显已存的密钥，所以"没输入新值"必须解释成"沿用已存的那把"，而不是"清空它"。
   const key = resolveConnectKey($("#admin-key").value, state.adminKey);
   // 判断必须用「刚填进来的这把密钥」，而不是 state 里那一份：以前这里在赋值之前就调用
   // hasAdminAccess()，于是「只填 ADMIN_API_KEY、不走账号登录」这条路一点都走不通。
   const authorized = Boolean(state.sessionToken || key);
-  if (!url || !authorized) {
+  if (!authorized) {
     showToast("请先完成管理员登录，或填入管理员密钥", true);
     openLoginDialog();
     return;
   }
-  state.apiUrl = url || SUPABASE_API;
+  state.apiUrl = url;
   state.adminKey = key;
   if ($("#remember-admin-key").checked && key) localStorage.setItem(ADMIN_KEY_STORAGE, key);
   // 取消勾选 = 不再落盘，并且把之前存的那份撤掉（本次会话照用 state 里的密钥）。
@@ -1819,7 +1822,11 @@ $("#login-skip").addEventListener("click", () => {
   $("#admin-login-dialog").close();
   // 连接表单住在「服务与连接」页，所以这里只是把用户送到那一页，不再开浮层。
   location.hash = "#/service";
-  showToast("API 地址与管理员密钥就在这一页");
+  // 那一组控件默认收起（未登录的人不该在页面上看到管理接口地址），从登录框点"先改连接设置"
+  // 过来的人显然是要改地址的，直接替他展开，别让他再猜在哪。
+  const details = $("#connection-details");
+  if (details) details.open = true;
+  showToast("连接设置已展开；地址留空即走内置默认");
 });
 $("#connect-button").addEventListener("click", connect);
 $("#refresh-button").addEventListener("click", refreshAll);
