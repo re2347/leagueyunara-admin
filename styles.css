@@ -424,6 +424,9 @@ html[data-mask="sensitive"] .sensitive::after { content: "••••••"; l
 .connect-card .remember-key { margin-top: 10px; }
 .compact-field { min-width: 240px; flex: 1 1 240px; }
 .key-field { min-width: 220px; flex: 0 1 260px; }
+/* 查询框在用户交互前是只读的（挡浏览器凭据填充），外观必须和普通输入框一致。 */
+.query-guarded { cursor: text; }
+.query-guarded::selection { background: transparent; }
 /* 「本机已存管理员密钥」这一行：只说存没存，绝不显示内容（密钥不回显，判据见 admin-key-policy.js）。 */
 .auth-hint { display: inline-flex; align-items: center; gap: 8px; color: var(--muted); font-size: 12px; }
 .auth-hint[hidden] { display: none; }

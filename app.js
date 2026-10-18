@@ -930,6 +930,8 @@ async function handleDeviceAction(event) {
       return;
     }
     $("#search-filter").value = prefix;
+    // 这是代码替用户填进去的，不是浏览器填充：解除只读，否则跳过去之后改不了这个前缀。
+    releaseQueryGuard($("#search-filter"));
     applyFilters();
     location.hash = "#/licenses";
     return;
@@ -1508,6 +1510,37 @@ function exportCurrentPageOrders() {
   downloadText(buildCsv(header, rows), `yunara-orders-page${state.orders.page}-${dateStamp()}.csv`, "text/csv;charset=utf-8");
   showToast(`已导出本页 ${items.length} 条订单`);
 }
+
+/**
+ * 查询框的浏览器自动填充防护。
+ *
+ * `autocomplete="off"` 挡不住 Chrome/Edge 的凭据填充 —— 它们按"这字段像不像用户名"决定，
+ * 不看这个属性。所以实测会出现「设备与租约的关键词框里凭空多出管理员账号」，
+ * 上一次只加 autocomplete="off" 的修法等于没修。
+ * 浏览器不会往**只读**字段里填凭据，于是加载即只读、用户真要输入时（点击/聚焦/按键）立刻解除：
+ * 正常打字感受不到多出来的步骤，而自动填充没有落脚点了。
+ */
+const GUARDED_QUERY_INPUTS = ["#search-filter", "#device-search", "#order-search"];
+
+function releaseQueryGuard(input) {
+  if (!input) return;
+  input.readOnly = false;
+  input.classList.remove("query-guarded");
+}
+
+function guardQueryInputs() {
+  for (const selector of GUARDED_QUERY_INPUTS) {
+    const input = $(selector);
+    if (!input) continue;
+    input.readOnly = true;
+    input.classList.add("query-guarded");
+    for (const event of ["pointerdown", "focus", "keydown"]) {
+      input.addEventListener(event, () => releaseQueryGuard(input), { once: true });
+    }
+  }
+}
+
+guardQueryInputs();
 
 function escapeHtml(value) {
   return String(value ?? "").replace(/[&<>'"]/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" }[char]));
