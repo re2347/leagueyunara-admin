@@ -153,6 +153,7 @@ async function requestWithFailover(path, options = {}) {
   let lastBody = {};
   let lastStatus = 0;
   let sessionRejected = false;
+  let sessionSuperseded = false;
   for (const endpoint of pinnedEndpoint ? [pinnedEndpoint] : apiCandidates()) {
     try {
       const response = await fetch(`${endpoint}${path}`, { cache: "no-store", ...fetchOptions, headers });
@@ -163,7 +164,12 @@ async function requestWithFailover(path, options = {}) {
         state.apiUrl = endpoint;
         return { response, body, endpoint };
       }
-      if (response.status === 401 && state.sessionToken) sessionRejected = true;
+      if (response.status === 401 && state.sessionToken) {
+        sessionRejected = true;
+        // 单活跃会话：同一账号在别处登录后，本标签页的旧令牌会被判 superseded。
+        // 分开报是因为"被踢"和"凭据不对"是两件事，管理员需要知道自己是被顶掉的。
+        if (body?.error?.code === "ADMIN_SESSION_SUPERSEDED") sessionSuperseded = true;
+      }
       if (!shouldTryAdminApiFallback({ status: response.status })) break;
     } catch (error) {
       lastBody = {};
@@ -180,7 +186,7 @@ async function requestWithFailover(path, options = {}) {
       state.sessionToken = "";
       state.adminUsername = "";
       stopAutoRefresh();
-      openLoginDialog();
+      openLoginDialog(sessionSuperseded ? "该账号在别处登录，当前会话已退出。若不是本人操作，请尽快修改管理员密码。" : "");
       clearStoredSession();
     } catch { /* 清理失败也要把真实错误抛给调用方，别改判成掉线 */ }
   }
@@ -281,8 +287,11 @@ function clearStoredSession() {
   }
 }
 
-function openLoginDialog() {
+function openLoginDialog(message) {
   const dialog = $("#admin-login-dialog");
+  const error = $("#login-error");
+  // 被踢（ADMIN_SESSION_SUPERSEDED）与凭据过期都从这里出去，不传 message 时保持原样不碰提示区。
+  if (message && error) { error.textContent = message; error.hidden = false; }
   if (!dialog.open) dialog.showModal();
   setTimeout(() => $("#admin-username")?.focus(), 0);
 }
